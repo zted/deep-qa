@@ -66,6 +66,7 @@ def main():
   a_overlap_test = numpy.load(os.path.join(data_dir, 'test.a_overlap_indices.npy'))
   y_test = numpy.load(os.path.join(data_dir, 'test.labels.npy'))
   qids_test = numpy.load(os.path.join(data_dir, 'test.qids.npy'))
+  pids_test = numpy.load(os.path.join(data_dir, 'test.pids.npy'))
 
   # x_train = numpy.load(os.path.join(data_dir, 'train.overlap_feats.npy'))
   # x_dev = numpy.load(os.path.join(data_dir, 'dev.overlap_feats.npy'))
@@ -134,7 +135,7 @@ def main():
   #######
   n_outs = 2
 
-  n_epochs = 25
+  n_epochs = 2
   batch_size = 50
   learning_rate = 0.1
   max_norm = 0
@@ -447,10 +448,10 @@ def main():
             # # dev_acc = map_score(qids_dev, y_dev, predict_prob_batch(dev_set_iterator)) * 100
             dev_acc = metrics.roc_auc_score(y_dev, y_pred_dev) * 100
             if dev_acc > best_dev_acc:
-              y_pred = predict_prob_batch(test_set_iterator)
-              test_acc = map_score(qids_test, y_test, y_pred) * 100
+              # y_pred = predict_prob_batch(test_set_iterator)
+              # test_acc = map_score(qids_test, y_test, y_pred) * 100
 
-              print('epoch: {} batch: {} dev auc: {:.4f}; test map: {:.4f}; best_dev_acc: {:.4f}'.format(epoch, i, dev_acc, test_acc, best_dev_acc))
+              print('epoch: {} batch: {} dev auc: {:.4f}; best_dev_acc: {:.4f}'.format(epoch, i, dev_acc, best_dev_acc))
               best_dev_acc = dev_acc
               best_params = [numpy.copy(p.get_value(borrow=True)) for p in params]
               no_best_dev_update = 0
@@ -468,9 +469,9 @@ def main():
     params[i].set_value(param, borrow=True)
 
   y_pred_test = predict_prob_batch(test_set_iterator)
-  test_acc = map_score(qids_test, y_test, y_pred_test) * 100
+  # test_acc = map_score(qids_test, y_test, y_pred_test) * 100
   fname = os.path.join(nnet_outdir, 'best_dev_params.epoch={:02d};batch={:05d};dev_acc={:.2f}.dat'.format(epoch, i, best_dev_acc))
-  numpy.savetxt(os.path.join(nnet_outdir, 'test.epoch={:02d};batch={:05d};dev_acc={:.2f}.predictions.npy'.format(epoch, i, best_dev_acc)), y_pred)
+  numpy.savetxt(os.path.join(nnet_outdir, 'test.epoch={:02d};batch={:05d};dev_acc={:.2f}.predictions.npy'.format(epoch, i, best_dev_acc)), y_pred_test)
   cPickle.dump(best_params, open(fname, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
 
@@ -480,20 +481,20 @@ def main():
   df_submission = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rank', 'sim', 'run_id'])
   df_submission['qid'] = qids_test
   df_submission['iter'] = 0
-  df_submission['docno'] = numpy.arange(N)
+  df_submission['docno'] = pids_test
   df_submission['rank'] = 0
   df_submission['sim'] = y_pred_test
   df_submission['run_id'] = 'nnet'
   df_submission.to_csv(os.path.join(nnet_outdir, 'submission.txt'), header=False, index=False, sep=' ')
 
-  df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
-  df_gold['qid'] = qids_test
-  df_gold['iter'] = 0
-  df_gold['docno'] = numpy.arange(N)
-  df_gold['rel'] = y_test
-  df_gold.to_csv(os.path.join(nnet_outdir, 'gold.txt'), header=False, index=False, sep=' ')
-
-  subprocess.call("/bin/sh run_eval.sh '{}'".format(nnet_outdir), shell=True)
+  # df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
+  # df_gold['qid'] = qids_test
+  # df_gold['iter'] = 0
+  # df_gold['docno'] = numpy.arange(N)
+  # df_gold['rel'] = y_test
+  # df_gold.to_csv(os.path.join(nnet_outdir, 'gold.txt'), header=False, index=False, sep=' ')
+  #
+  # subprocess.call("/bin/sh run_eval.sh '{}'".format(nnet_outdir), shell=True)
 
 
 if __name__ == '__main__':
