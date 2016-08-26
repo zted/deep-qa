@@ -18,8 +18,7 @@ def main():
   np.random.seed(123)
 
   data_dirs = [
-              'TRAIN',
-              'TRAIN-ALL',
+              'TRAIN'
               ]
 
   for data_dir in data_dirs:

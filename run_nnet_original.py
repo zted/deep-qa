@@ -27,29 +27,49 @@ def main():
     # ZEROUT_DUMMY_WORD = False
     ZEROUT_DUMMY_WORD = True
 
-    data_dir = 'TRAIN'
+    ## Load data
+    # mode = 'TRAIN-ALL'
+    mode = 'train'
+    if len(sys.argv) > 1:
+        mode = sys.argv[1]
+        if not mode in ['TRAIN', 'TRAIN-ALL']:
+            print "ERROR! The two possible training settings are: ['TRAIN', 'TRAIN-ALL']"
+            sys.exit(1)
 
-    q_train = numpy.load(os.path.join(data_dir, 'train.questions.npy'))
-    a_train = numpy.load(os.path.join(data_dir, 'train.answers.npy'))
-    q_overlap_train = numpy.load(os.path.join(data_dir, 'train.q_overlap_indices.npy'))
-    a_overlap_train = numpy.load(os.path.join(data_dir, 'train.a_overlap_indices.npy'))
-    y_train = numpy.load(os.path.join(data_dir, 'train.labels.npy'))
+    print "Running training in the {} setting".format(mode)
+
+    data_dir = mode
+
+    if mode in ['TRAIN-ALL']:
+        q_train = numpy.load(os.path.join(data_dir, 'train-all.questions.npy'))
+        a_train = numpy.load(os.path.join(data_dir, 'train-all.answers.npy'))
+        q_overlap_train = numpy.load(os.path.join(data_dir, 'train-all.q_overlap_indices.npy'))
+        a_overlap_train = numpy.load(os.path.join(data_dir, 'train-all.a_overlap_indices.npy'))
+        y_train = numpy.load(os.path.join(data_dir, 'train-all.labels.npy'))
+    else:
+        q_train = numpy.load(os.path.join(data_dir, 'train.questions.npy'))
+        a_train = numpy.load(os.path.join(data_dir, 'train.answers.npy'))
+        q_overlap_train = numpy.load(os.path.join(data_dir, 'train.q_overlap_indices.npy'))
+        a_overlap_train = numpy.load(os.path.join(data_dir, 'train.a_overlap_indices.npy'))
+        y_train = numpy.load(os.path.join(data_dir, 'train.labels.npy'))
 
     q_dev = numpy.load(os.path.join(data_dir, 'dev.questions.npy'))
     a_dev = numpy.load(os.path.join(data_dir, 'dev.answers.npy'))
     q_overlap_dev = numpy.load(os.path.join(data_dir, 'dev.q_overlap_indices.npy'))
     a_overlap_dev = numpy.load(os.path.join(data_dir, 'dev.a_overlap_indices.npy'))
     y_dev = numpy.load(os.path.join(data_dir, 'dev.labels.npy'))
+    qids_dev = numpy.load(os.path.join(data_dir, 'dev.qids.npy'))
 
     q_test = numpy.load(os.path.join(data_dir, 'test.questions.npy'))
     a_test = numpy.load(os.path.join(data_dir, 'test.answers.npy'))
     q_overlap_test = numpy.load(os.path.join(data_dir, 'test.q_overlap_indices.npy'))
     a_overlap_test = numpy.load(os.path.join(data_dir, 'test.a_overlap_indices.npy'))
     y_test = numpy.load(os.path.join(data_dir, 'test.labels.npy'))
+    qids_test = numpy.load(os.path.join(data_dir, 'test.qids.npy'))
 
-    x_train = numpy.load(os.path.join(data_dir, 'train.overlap_feats.npy'))
-    x_dev = numpy.load(os.path.join(data_dir, 'dev.overlap_feats.npy'))
-    x_test = numpy.load(os.path.join(data_dir, 'test.overlap_feats.npy'))
+    # x_train = numpy.load(os.path.join(data_dir, 'train.overlap_feats.npy'))
+    # x_dev = numpy.load(os.path.join(data_dir, 'dev.overlap_feats.npy'))
+    # x_test = numpy.load(os.path.join(data_dir, 'test.overlap_feats.npy'))
 
     # feats_ndim = x_train.shape[1]
 
@@ -275,6 +295,9 @@ def main():
     nnet_outdir = 'exp.out/ndim={};batch={};max_norm={};learning_rate={};{}'.format(ndim, batch_size, max_norm, learning_rate, ts)
     if not os.path.exists(nnet_outdir):
         os.makedirs(nnet_outdir)
+    nnet_fname = os.path.join(nnet_outdir, 'nnet.dat')
+    print "Saving to", nnet_fname
+    cPickle.dump([train_nnet, test_nnet], open(nnet_fname, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
     total_params = sum([numpy.prod(param.shape.eval()) for param in params])
     print 'Total params number:', total_params
@@ -405,20 +428,11 @@ def main():
     # weights_dev[y_dev == 1] = weights_data[1]
     # print weights_dev
 
-    def findWrongPredictions(y_true, y_pred, pids):
-        wrong_pids = []
-        for n, pairs in enumerate(zip(y_true, y_pred)):
-            if pairs[0] != round(pairs[1]):
-                print(pids[n])
-                wrong_pids.append(pids[n])
-        return wrong_pids
-
     best_dev_acc = -numpy.inf
     epoch = 0
     timer_train = time.time()
     no_best_dev_update = 0
     num_train_batches = len(train_set_iterator)
-
     while epoch < n_epochs:
         timer = time.time()
         for i, (x_q, x_a, x_q_overlap, x_a_overlap, y) in enumerate(tqdm(train_set_iterator), 1):
@@ -433,55 +447,53 @@ def main():
                 # # dev_acc = map_score(qids_dev, y_dev, predict_prob_batch(dev_set_iterator)) * 100
                 dev_acc = metrics.roc_auc_score(y_dev, y_pred_dev) * 100
                 if dev_acc > best_dev_acc:
-                    # y_pred = predict_prob_batch(test_set_iterator)
-                    # test_acc = map_score(qids_test, y_test, y_pred) * 100
+                    y_pred = predict_prob_batch(test_set_iterator)
+                    test_acc = map_score(qids_test, y_test, y_pred) * 100
 
-                    print('epoch: {} batch: {} dev auc: {:.4f}; best_dev_acc: {:.4f}'.format(epoch, i, dev_acc, best_dev_acc))
-                    # wrongPreds = findWrongPredictions(y_dev, y_pred_dev, pids_dev)
+                    print('epoch: {} batch: {} dev auc: {:.4f}; test map: {:.4f}; best_dev_acc: {:.4f}'.format(epoch, i, dev_acc, test_acc, best_dev_acc))
                     best_dev_acc = dev_acc
                     best_params = [numpy.copy(p.get_value(borrow=True)) for p in params]
                     no_best_dev_update = 0
-                    fname = os.path.join(nnet_outdir, 'best_dev_params_during_training')
-                    cPickle.dump(best_params, open(fname, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
-        if no_best_dev_update >= 2:
+        if no_best_dev_update >= 3:
             print "Quitting after of no update of the best score on dev set", no_best_dev_update
             break
 
         print('epoch {} took {:.4f} seconds'.format(epoch, time.time() - timer))
         epoch += 1
         no_best_dev_update += 1
-    fname = os.path.join(nnet_outdir, 'best_dev_params.epoch={:02d};batch={:05d};dev_acc={:.2f}.dat'.format(epoch, i, best_dev_acc))
-    cPickle.dump(best_params, open(fname, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
     print('Training took: {:.4f} seconds'.format(time.time() - timer_train))
     for i, param in enumerate(best_params):
         params[i].set_value(param, borrow=True)
 
-    # y_pred_test = predict_prob_batch(test_set_iterator)
-    # test_acc = map_score(qids_test, y_test, y_pred_test) * 100
+    y_pred_test = predict_prob_batch(test_set_iterator)
+    test_acc = map_score(qids_test, y_test, y_pred_test) * 100
+    fname = os.path.join(nnet_outdir, 'best_dev_params.epoch={:02d};batch={:05d};dev_acc={:.2f}.dat'.format(epoch, i, best_dev_acc))
+    numpy.savetxt(os.path.join(nnet_outdir, 'test.epoch={:02d};batch={:05d};dev_acc={:.2f}.predictions.npy'.format(epoch, i, best_dev_acc)), y_pred)
+    cPickle.dump(best_params, open(fname, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
 
-    # print "Running trec_eval script..."
-    # N = len(y_pred_test)
-    #
-    # df_submission = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rank', 'sim', 'run_id'])
-    # df_submission['qid'] = qids_test
-    # df_submission['iter'] = 0
-    # df_submission['docno'] = pids_test
-    # df_submission['rank'] = 0
-    # df_submission['sim'] = y_pred_test
-    # df_submission['run_id'] = 'nnet'
-    # df_submission.to_csv(os.path.join(nnet_outdir, 'submission.txt'), header=False, index=False, sep=' ')
+    print "Running trec_eval script..."
+    N = len(y_pred_test)
 
-    # df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
-    # df_gold['qid'] = qids_test
-    # df_gold['iter'] = 0
-    # df_gold['docno'] = numpy.arange(N)
-    # df_gold['rel'] = y_test
-    # df_gold.to_csv(os.path.join(nnet_outdir, 'gold.txt'), header=False, index=False, sep=' ')
-    #
-    # subprocess.call("/bin/sh run_eval.sh '{}'".format(nnet_outdir), shell=True)
+    df_submission = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rank', 'sim', 'run_id'])
+    df_submission['qid'] = qids_test
+    df_submission['iter'] = 0
+    df_submission['docno'] = numpy.arange(N)
+    df_submission['rank'] = 0
+    df_submission['sim'] = y_pred_test
+    df_submission['run_id'] = 'nnet'
+    df_submission.to_csv(os.path.join(nnet_outdir, 'submission.txt'), header=False, index=False, sep=' ')
+
+    df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
+    df_gold['qid'] = qids_test
+    df_gold['iter'] = 0
+    df_gold['docno'] = numpy.arange(N)
+    df_gold['rel'] = y_test
+    df_gold.to_csv(os.path.join(nnet_outdir, 'gold.txt'), header=False, index=False, sep=' ')
+
+    subprocess.call("/bin/sh run_eval.sh '{}'".format(nnet_outdir), shell=True)
 
 
 if __name__ == '__main__':

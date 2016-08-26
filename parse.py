@@ -152,8 +152,7 @@ if __name__ == '__main__':
 
 
   train = 'jacana-qa-naacl2013-data-results/train.xml'
-  train_all = 'jacana-qa-naacl2013-data-results/train-all.xml'
-  train_files = [train, train_all]
+  train_files = [train]
 
   for train in train_files:
     print train

@@ -30,35 +30,15 @@ def main():
     ## Load data
     # mode = 'TRAIN-ALL'
     mode = 'train'
-    if len(sys.argv) > 1:
-        mode = sys.argv[1]
-        if not mode in ['TRAIN', 'TRAIN-ALL']:
-            print "ERROR! The two possible training settings are: ['TRAIN', 'TRAIN-ALL']"
-            sys.exit(1)
-
     print "Running training in the {} setting".format(mode)
 
     data_dir = '/home/ted/research/deep-qa/TRAIN'
 
-    if mode in ['TRAIN-ALL']:
-        q_train = numpy.load(os.path.join(data_dir, 'train-all.questions.npy'))
-        a_train = numpy.load(os.path.join(data_dir, 'train-all.answers.npy'))
-        q_overlap_train = numpy.load(os.path.join(data_dir, 'train-all.q_overlap_indices.npy'))
-        a_overlap_train = numpy.load(os.path.join(data_dir, 'train-all.a_overlap_indices.npy'))
-        y_train = numpy.load(os.path.join(data_dir, 'train-all.labels.npy'))
-    else:
-        q_train = numpy.load(os.path.join(data_dir, 'train.questions.npy'))
-        a_train = numpy.load(os.path.join(data_dir, 'train.answers.npy'))
-        q_overlap_train = numpy.load(os.path.join(data_dir, 'train.q_overlap_indices.npy'))
-        a_overlap_train = numpy.load(os.path.join(data_dir, 'train.a_overlap_indices.npy'))
-        y_train = numpy.load(os.path.join(data_dir, 'train.labels.npy'))
-
-    q_dev = numpy.load(os.path.join(data_dir, 'dev.questions.npy'))
-    a_dev = numpy.load(os.path.join(data_dir, 'dev.answers.npy'))
-    q_overlap_dev = numpy.load(os.path.join(data_dir, 'dev.q_overlap_indices.npy'))
-    a_overlap_dev = numpy.load(os.path.join(data_dir, 'dev.a_overlap_indices.npy'))
-    y_dev = numpy.load(os.path.join(data_dir, 'dev.labels.npy'))
-    qids_dev = numpy.load(os.path.join(data_dir, 'dev.qids.npy'))
+    q_train = numpy.load(os.path.join(data_dir, 'train.questions.npy'))
+    a_train = numpy.load(os.path.join(data_dir, 'train.answers.npy'))
+    q_overlap_train = numpy.load(os.path.join(data_dir, 'train.q_overlap_indices.npy'))
+    a_overlap_train = numpy.load(os.path.join(data_dir, 'train.a_overlap_indices.npy'))
+    y_train = numpy.load(os.path.join(data_dir, 'train.labels.npy'))
 
     q_test = numpy.load(os.path.join(data_dir, 'test.questions.npy'))
     a_test = numpy.load(os.path.join(data_dir, 'test.answers.npy'))
@@ -69,15 +49,12 @@ def main():
     pids_test = numpy.load(os.path.join(data_dir, 'test.pids.npy'))
 
     print 'y_train', numpy.unique(y_train, return_counts=True)
-    print 'y_dev', numpy.unique(y_dev, return_counts=True)
     print 'y_test', numpy.unique(y_test, return_counts=True)
 
     print 'q_train', q_train.shape
-    print 'q_dev', q_dev.shape
     print 'q_test', q_test.shape
 
     print 'a_train', a_train.shape
-    print 'a_dev', a_dev.shape
     print 'a_test', a_test.shape
 
     numpy_rng = numpy.random.RandomState(123)
@@ -259,26 +236,6 @@ def main():
                    # x: batch_x
                    }
 
-    inputs_train = [batch_x_q,
-                    batch_x_a,
-                    batch_x_q_overlap,
-                    batch_x_a_overlap,
-                    # batch_x,
-                    batch_y,
-                    ]
-
-    givens_train = {x_q: batch_x_q,
-                    x_a: batch_x_a,
-                    x_q_overlap: batch_x_q_overlap,
-                    x_a_overlap: batch_x_a_overlap,
-                    # x: batch_x,
-                    y: batch_y}
-
-    train_fn = theano.function(inputs=inputs_train,
-                               outputs=cost,
-                               updates=updates,
-                               givens=givens_train)
-
     pred_fn = theano.function(inputs=inputs_pred,
                               outputs=predictions,
                               givens=givens_pred)
@@ -287,37 +244,14 @@ def main():
                                    outputs=predictions_prob,
                                    givens=givens_pred)
 
-    def predict_batch(batch_iterator):
-        preds = numpy.hstack([pred_fn(batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap) for batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, _ in batch_iterator])
-        return preds[:batch_iterator.n_samples]
-
     def predict_prob_batch(batch_iterator):
         preds = numpy.hstack([pred_prob_fn(batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap) for batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, _ in batch_iterator])
         return preds[:batch_iterator.n_samples]
 
-    train_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_train, a_train, q_overlap_train, a_overlap_train, y_train], batch_size=batch_size, randomize=True)
-    dev_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_dev, a_dev, q_overlap_dev, a_overlap_dev, y_dev], batch_size=batch_size, randomize=False)
     test_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_test, a_test, q_overlap_test, a_overlap_test, y_test], batch_size=batch_size, randomize=False)
 
     labels = sorted(numpy.unique(y_test))
     print 'labels', labels
-
-    def map_score(qids, labels, preds):
-        qid2cand = defaultdict(list)
-        for qid, label, pred in zip(qids, labels, preds):
-            qid2cand[qid].append((pred, label))
-
-        average_precs = []
-        for qid, candidates in qid2cand.iteritems():
-            average_prec = 0
-            running_correct_count = 0
-            for i, (score, label) in enumerate(sorted(candidates, reverse=True), 1):
-                if label > 0:
-                    running_correct_count += 1
-                    average_prec += float(running_correct_count) / i
-            average_precs.append(average_prec / (running_correct_count + 1e-6))
-        map_score = sum(average_precs) / len(average_precs)
-        return map_score
 
     print "Zero out dummy word:", ZEROUT_DUMMY_WORD
     if ZEROUT_DUMMY_WORD:
@@ -328,7 +262,7 @@ def main():
     epoch = 0
     timer_train = time.time()
 
-    model_file = open('/home/ted/research/deep-qa/exp.out/saturday_aug13/best_dev_params.dat', 'rb')
+    model_file = open('./exp.out/best_dev_params_combined', 'rb')
     best_params = cPickle.load(model_file)
     model_file.close()
 
@@ -349,20 +283,20 @@ def main():
     df_submission = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rank', 'sim', 'run_id'])
     df_submission['qid'] = qids_test
     df_submission['iter'] = 0
-    df_submission['docno'] = numpy.arange(N)
+    df_submission['docno'] = pids_test
     df_submission['rank'] = 0
     df_submission['sim'] = y_pred_test
     df_submission['run_id'] = 'nnet'
     df_submission.to_csv(os.path.join(nnet_outdir, 'submission.txt'), header=False, index=False, sep=' ')
 
-    df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
-    df_gold['qid'] = qids_test
-    df_gold['iter'] = 0
-    df_gold['docno'] = numpy.arange(N)
-    df_gold['rel'] = y_test
-    df_gold.to_csv(os.path.join(nnet_outdir, 'gold.txt'), header=False, index=False, sep=' ')
+    # df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
+    # df_gold['qid'] = qids_test
+    # df_gold['iter'] = 0
+    # df_gold['docno'] = numpy.arange(N)
+    # df_gold['rel'] = y_test
+    # df_gold.to_csv(os.path.join(nnet_outdir, 'gold.txt'), header=False, index=False, sep=' ')
 
-    subprocess.call("/bin/sh run_eval.sh '{}'".format(nnet_outdir), shell=True)
+    # subprocess.call("/bin/sh run_eval.sh '{}'".format(nnet_outdir), shell=True)
 
 if __name__ == '__main__':
     main()

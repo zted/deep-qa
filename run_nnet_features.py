@@ -458,30 +458,30 @@ def main():
     for i, param in enumerate(best_params):
         params[i].set_value(param, borrow=True)
 
-    # y_pred_test = predict_prob_batch(test_set_iterator)
-    # test_acc = map_score(qids_test, y_test, y_pred_test) * 100
+        # y_pred_test = predict_prob_batch(test_set_iterator)
+        # test_acc = map_score(qids_test, y_test, y_pred_test) * 100
 
 
-    # print "Running trec_eval script..."
-    # N = len(y_pred_test)
-    #
-    # df_submission = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rank', 'sim', 'run_id'])
-    # df_submission['qid'] = qids_test
-    # df_submission['iter'] = 0
-    # df_submission['docno'] = pids_test
-    # df_submission['rank'] = 0
-    # df_submission['sim'] = y_pred_test
-    # df_submission['run_id'] = 'nnet'
-    # df_submission.to_csv(os.path.join(nnet_outdir, 'submission.txt'), header=False, index=False, sep=' ')
+        # print "Running trec_eval script..."
+        # N = len(y_pred_test)
+        #
+        # df_submission = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rank', 'sim', 'run_id'])
+        # df_submission['qid'] = qids_test
+        # df_submission['iter'] = 0
+        # df_submission['docno'] = pids_test
+        # df_submission['rank'] = 0
+        # df_submission['sim'] = y_pred_test
+        # df_submission['run_id'] = 'nnet'
+        # df_submission.to_csv(os.path.join(nnet_outdir, 'submission.txt'), header=False, index=False, sep=' ')
 
-    # df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
-    # df_gold['qid'] = qids_test
-    # df_gold['iter'] = 0
-    # df_gold['docno'] = numpy.arange(N)
-    # df_gold['rel'] = y_test
-    # df_gold.to_csv(os.path.join(nnet_outdir, 'gold.txt'), header=False, index=False, sep=' ')
-    #
-    # subprocess.call("/bin/sh run_eval.sh '{}'".format(nnet_outdir), shell=True)
+        # df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
+        # df_gold['qid'] = qids_test
+        # df_gold['iter'] = 0
+        # df_gold['docno'] = numpy.arange(N)
+        # df_gold['rel'] = y_test
+        # df_gold.to_csv(os.path.join(nnet_outdir, 'gold.txt'), header=False, index=False, sep=' ')
+        #
+        # subprocess.call("/bin/sh run_eval.sh '{}'".format(nnet_outdir), shell=True)
 
 
 if __name__ == '__main__':

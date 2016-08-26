@@ -17,8 +17,8 @@ def load_aquaint(fname):
     answers = []
     labels = []
     with open(fname, 'r') as f:
-        for line in f:
-            splits = line.rstrip('\n').split(' ')
+        for nucount, line in enumerate(f):
+            splits = line.rstrip('\r\n').split(' ')
             pid = splits[0]
             relevance = splits[1]
             sentType = splits[2]
@@ -179,14 +179,14 @@ if __name__ == '__main__':
     stoplist = None
 
 
-    train = '/home/ted/research/deep-qa/aquaint/train.txt'
+    train = './aquaint/train.txt'
     train_files = [train]
 
     for train in train_files:
         print train
 
-        dev = '/home/ted/research/deep-qa/aquaint/dev.txt'
-        test = '/home/ted/research/deep-qa/aquaint/test.txt'
+        dev = './aquaint/dev.txt'
+        test = './aquaint/test.txt'
 
         train_basename = os.path.basename(train)
         train_basename = 'train'
