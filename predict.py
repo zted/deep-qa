@@ -262,7 +262,7 @@ def main():
     epoch = 0
     timer_train = time.time()
 
-    model_file = open('./exp.out/best_dev_params_combined', 'rb')
+    model_file = open('./saved_params/params_tf_neg_10', 'rb')
     best_params = cPickle.load(model_file)
     model_file.close()
 
@@ -276,10 +276,16 @@ def main():
     numpy.savetxt(os.path.join(nnet_outdir, 'test.epoch={:02d};batch={:05d};dev_acc={:.2f}.predictions.npy'.format(epoch, i, best_dev_acc)), y_pred_test)
     cPickle.dump(best_params, open(fname, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
+    def writeOut(somefile, someArray):
+        sortedArray = sorted(someArray, key=lambda score: score[0], reverse=True)
+        for a in sortedArray:
+            somefile.write('\t'.join(a[1]))
+        return
 
     print "Running trec_eval script..."
     N = len(y_pred_test)
 
+    submission_name = os.path.join(nnet_outdir, 'submission.txt')
     df_submission = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rank', 'sim', 'run_id'])
     df_submission['qid'] = qids_test
     df_submission['iter'] = 0
@@ -287,7 +293,27 @@ def main():
     df_submission['rank'] = 0
     df_submission['sim'] = y_pred_test
     df_submission['run_id'] = 'nnet'
-    df_submission.to_csv(os.path.join(nnet_outdir, 'submission.txt'), header=False, index=False, sep=' ')
+    df_submission.to_csv(submission_name, header=False, index=False, sep=' ')
+
+    sortedSubmission = os.path.join(nnet_outdir, 'submission.sorted.txt')
+    outf = open(sortedSubmission, 'w')
+    with open(submission_name, 'r') as f:
+        previous_id = '0'
+        first = True
+        someArray = []
+        for line in f:
+            splits = line.split(' ')
+            ID = splits[0]
+            score = float(splits[4])
+            if ID != previous_id and not first:
+                writeOut(outf, someArray)
+                someArray = []
+            someTup = (score, splits)
+            someArray.append(someTup)
+            first = False
+            previous_id = ID
+        writeOut(outf,someArray)
+    outf.close()
 
     # df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
     # df_gold['qid'] = qids_test
