@@ -382,7 +382,7 @@ def main():
                                    givens=givens_pred)
 
     def predict_batch(batch_iterator):
-        preds = numpy.hstack([pred_fn(batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap) for batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, _ in batch_iterator])
+        preds = numpy.hstack([pred_fn(batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, batch_x) for batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, batch_x, _ in batch_iterator])
         return preds[:batch_iterator.n_samples]
 
     def predict_prob_batch(batch_iterator):

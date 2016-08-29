@@ -200,9 +200,6 @@ def main():
     nnet_outdir = 'exp.out/ndim={};batch={};max_norm={};learning_rate={};{}'.format(ndim, batch_size, max_norm, learning_rate, ts)
     if not os.path.exists(nnet_outdir):
         os.makedirs(nnet_outdir)
-    nnet_fname = os.path.join(nnet_outdir, 'nnet.dat')
-    print "Saving to", nnet_fname
-    cPickle.dump([train_nnet, test_nnet], open(nnet_fname, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
 
     total_params = sum([numpy.prod(param.shape.eval()) for param in params])

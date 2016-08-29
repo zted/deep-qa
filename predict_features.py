@@ -48,6 +48,9 @@ def main():
     qids_test = numpy.load(os.path.join(data_dir, 'test.qids.npy'))
     pids_test = numpy.load(os.path.join(data_dir, 'test.pids.npy'))
 
+    add_features_test = numpy.load(os.path.join(data_dir, 'additional_feats_test.npy'))
+    add_features_test = add_features_test.reshape(a_test.shape[0], 1)
+
     print 'y_train', numpy.unique(y_train, return_counts=True)
     print 'y_test', numpy.unique(y_test, return_counts=True)
 
@@ -83,6 +86,7 @@ def main():
     x_a = T.lmatrix('a')
     x_a_overlap = T.lmatrix('a_overlap')
     y = T.ivector('y')
+    additional_feats = T.dmatrix('additional_feats')
 
     #######
     n_outs = 2
@@ -182,11 +186,21 @@ def main():
     hidden_layer = nn_layers.LinearLayer(numpy_rng, n_in=n_in, n_out=n_in, activation=activation)
     hidden_layer.set_input(pairwise_layer.output)
 
-    classifier = nn_layers.LogisticRegression(n_in=n_in, n_out=n_outs)
-    classifier.set_input(hidden_layer.output)
+    hidden_layer2 = nn_layers.LinearLayer(numpy_rng, n_in=n_outs, n_out=n_outs, activation=activation)
+    hidden_layer2.set_input(hidden_layer.output)
+
+    pairwise_layer2 = nn_layers.PairwiseFeatsOnlyLayer(n_in=n_outs)
+    pairwise_layer2.set_input((hidden_layer2.output, additional_feats))
+
+    n_in = n_outs + add_features_test.shape[1]
+    hidden_layer3 = nn_layers.LinearLayer(numpy_rng, n_in=n_in, n_out=n_outs, activation=activation)
+    hidden_layer3.set_input(pairwise_layer2.output)
+
+    classifier = nn_layers.LogisticRegression(n_in=n_outs, n_out=n_outs)
+    classifier.set_input(hidden_layer3.output)
 
 
-    train_nnet = nn_layers.FeedForwardNet(layers=[nnet_q, nnet_a, pairwise_layer, hidden_layer, classifier],
+    train_nnet = nn_layers.FeedForwardNet(layers=[nnet_q, nnet_a, pairwise_layer, hidden_layer, hidden_layer2, pairwise_layer2, hidden_layer3, classifier],
                                           # train_nnet = nn_layers.FeedForwardNet(layers=[nnet_q, nnet_a, x_hidden_layer, classifier],
                                           name="Training nnet")
     test_nnet = train_nnet
@@ -200,9 +214,6 @@ def main():
     nnet_outdir = 'exp.out/ndim={};batch={};max_norm={};learning_rate={};{}'.format(ndim, batch_size, max_norm, learning_rate, ts)
     if not os.path.exists(nnet_outdir):
         os.makedirs(nnet_outdir)
-    nnet_fname = os.path.join(nnet_outdir, 'nnet.dat')
-    print "Saving to", nnet_fname
-    cPickle.dump([train_nnet, test_nnet], open(nnet_fname, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
 
     total_params = sum([numpy.prod(param.shape.eval()) for param in params])
@@ -212,7 +223,7 @@ def main():
     predictions = test_nnet.layers[-1].y_pred
     predictions_prob = test_nnet.layers[-1].p_y_given_x[:,-1]
 
-    # batch_x = T.dmatrix('batch_x')
+    batch_x = T.dmatrix('batch_x')
     batch_x_q = T.lmatrix('batch_x_q')
     batch_x_a = T.lmatrix('batch_x_a')
     batch_x_q_overlap = T.lmatrix('batch_x_q_overlap')
@@ -226,14 +237,14 @@ def main():
                    batch_x_a,
                    batch_x_q_overlap,
                    batch_x_a_overlap,
-                   # batch_x,
+                   batch_x,
                    ]
 
     givens_pred = {x_q: batch_x_q,
                    x_a: batch_x_a,
                    x_q_overlap: batch_x_q_overlap,
                    x_a_overlap: batch_x_a_overlap,
-                   # x: batch_x
+                   additional_feats: batch_x
                    }
 
     pred_fn = theano.function(inputs=inputs_pred,
@@ -245,10 +256,10 @@ def main():
                                    givens=givens_pred)
 
     def predict_prob_batch(batch_iterator):
-        preds = numpy.hstack([pred_prob_fn(batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap) for batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, _ in batch_iterator])
+        preds = numpy.hstack([pred_prob_fn(batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, batch_x) for batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, batch_x, _ in batch_iterator])
         return preds[:batch_iterator.n_samples]
 
-    test_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_test, a_test, q_overlap_test, a_overlap_test, y_test], batch_size=batch_size, randomize=False)
+    test_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_test, a_test, q_overlap_test, a_overlap_test, add_features_test, y_test], batch_size=batch_size, randomize=False)
 
     labels = sorted(numpy.unique(y_test))
     print 'labels', labels
@@ -262,7 +273,7 @@ def main():
     epoch = 0
     timer_train = time.time()
 
-    model_file = open('./saved_params/params_tf_neg_10', 'rb')
+    model_file = open('./saved_params/params_add_feature', 'rb')
     best_params = cPickle.load(model_file)
     model_file.close()
 
