@@ -51,6 +51,12 @@ def main():
     x_dev = numpy.load(os.path.join(data_dir, 'dev.overlap_feats.npy'))
     x_test = numpy.load(os.path.join(data_dir, 'test.overlap_feats.npy'))
 
+    add_features_train = numpy.load(os.path.join(data_dir, 'additional_feats_train.npy'))
+    add_features_dev = numpy.load(os.path.join(data_dir, 'additional_feats_dev.npy'))
+
+    add_features_train = add_features_train.reshape(a_train.shape[0], 1)
+    add_features_dev = add_features_dev.reshape(a_dev.shape[0], 1)
+
     # feats_ndim = x_train.shape[1]
 
     # from sklearn.preprocessing import StandardScaler
@@ -71,6 +77,8 @@ def main():
     print 'a_train', a_train.shape
     print 'a_dev', a_dev.shape
     print 'a_test', a_test.shape
+
+    print 'x_dev', x_dev.shape
 
     ## Get the word embeddings from the nnet trained on SemEval
     # ndim = 40
@@ -110,6 +118,7 @@ def main():
     x_a = T.lmatrix('a')
     x_a_overlap = T.lmatrix('a_overlap')
     y = T.ivector('y')
+    additional_feats = T.dmatrix('additional_feats')
 
     #######
     n_outs = 2
@@ -254,14 +263,24 @@ def main():
     # n_in = feats_ndim + 1
     # n_in = feats_ndim + 50
 
-    hidden_layer = nn_layers.LinearLayer(numpy_rng, n_in=n_in, n_out=n_in, activation=activation)
+    hidden_layer = nn_layers.LinearLayer(numpy_rng, n_in=n_in, n_out=n_outs, activation=activation)
     hidden_layer.set_input(pairwise_layer.output)
 
-    classifier = nn_layers.LogisticRegression(n_in=n_in, n_out=n_outs)
-    classifier.set_input(hidden_layer.output)
+    hidden_layer2 = nn_layers.LinearLayer(numpy_rng, n_in=n_outs, n_out=n_outs, activation=activation)
+    hidden_layer2.set_input(hidden_layer.output)
+
+    pairwise_layer2 = nn_layers.PairwiseFeatsOnlyLayer(n_in=n_outs)
+    pairwise_layer2.set_input((hidden_layer2.output, additional_feats))
+
+    n_in = n_outs + add_features_train.shape[1]
+    hidden_layer3 = nn_layers.LinearLayer(numpy_rng, n_in=n_in, n_out=n_outs, activation=activation)
+    hidden_layer3.set_input(pairwise_layer2.output)
+
+    classifier = nn_layers.LogisticRegression(n_in=n_outs, n_out=n_outs)
+    classifier.set_input(hidden_layer3.output)
 
 
-    train_nnet = nn_layers.FeedForwardNet(layers=[nnet_q, nnet_a, pairwise_layer, hidden_layer, classifier],
+    train_nnet = nn_layers.FeedForwardNet(layers=[nnet_q, nnet_a, pairwise_layer, hidden_layer, hidden_layer2, pairwise_layer2, hidden_layer3, classifier],
                                           # train_nnet = nn_layers.FeedForwardNet(layers=[nnet_q, nnet_a, x_hidden_layer, classifier],
                                           name="Training nnet")
     test_nnet = train_nnet
@@ -310,7 +329,7 @@ def main():
     #   print w.name, L2_reg
     #   cost += T.sum(w**2) * L2_reg
 
-    # batch_x = T.dmatrix('batch_x')
+    batch_x = T.dmatrix('batch_x')
     batch_x_q = T.lmatrix('batch_x_q')
     batch_x_a = T.lmatrix('batch_x_a')
     batch_x_q_overlap = T.lmatrix('batch_x_q_overlap')
@@ -324,21 +343,21 @@ def main():
                    batch_x_a,
                    batch_x_q_overlap,
                    batch_x_a_overlap,
-                   # batch_x,
+                   batch_x,
                    ]
 
     givens_pred = {x_q: batch_x_q,
                    x_a: batch_x_a,
                    x_q_overlap: batch_x_q_overlap,
                    x_a_overlap: batch_x_a_overlap,
-                   # x: batch_x
+                   additional_feats: batch_x
                    }
 
     inputs_train = [batch_x_q,
                     batch_x_a,
                     batch_x_q_overlap,
                     batch_x_a_overlap,
-                    # batch_x,
+                    batch_x,
                     batch_y,
                     ]
 
@@ -346,7 +365,7 @@ def main():
                     x_a: batch_x_a,
                     x_q_overlap: batch_x_q_overlap,
                     x_a_overlap: batch_x_a_overlap,
-                    # x: batch_x,
+                    additional_feats: batch_x,
                     y: batch_y}
 
     train_fn = theano.function(inputs=inputs_train,
@@ -367,11 +386,11 @@ def main():
         return preds[:batch_iterator.n_samples]
 
     def predict_prob_batch(batch_iterator):
-        preds = numpy.hstack([pred_prob_fn(batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap) for batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, _ in batch_iterator])
+        preds = numpy.hstack([pred_prob_fn(batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, batch_x) for batch_x_q, batch_x_a, batch_x_q_overlap, batch_x_a_overlap, batch_x, _ in batch_iterator])
         return preds[:batch_iterator.n_samples]
 
-    train_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_train, a_train, q_overlap_train, a_overlap_train, y_train], batch_size=batch_size, randomize=True)
-    dev_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_dev, a_dev, q_overlap_dev, a_overlap_dev, y_dev], batch_size=batch_size, randomize=False)
+    train_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_train, a_train, q_overlap_train, a_overlap_train, add_features_train, y_train], batch_size=batch_size, randomize=True)
+    dev_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_dev, a_dev, q_overlap_dev, a_overlap_dev, add_features_dev, y_dev], batch_size=batch_size, randomize=False)
     test_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_test, a_test, q_overlap_test, a_overlap_test, y_test], batch_size=batch_size, randomize=False)
 
     labels = sorted(numpy.unique(y_test))
@@ -421,8 +440,8 @@ def main():
 
     while epoch < n_epochs:
         timer = time.time()
-        for i, (x_q, x_a, x_q_overlap, x_a_overlap, y) in enumerate(tqdm(train_set_iterator), 1):
-            train_fn(x_q, x_a, x_q_overlap, x_a_overlap, y)
+        for i, (x_q, x_a, x_q_overlap, x_a_overlap, x, y) in enumerate(tqdm(train_set_iterator), 1):
+            train_fn(x_q, x_a, x_q_overlap, x_a_overlap, x, y)
 
             # Make sure the null word in the word embeddings always remains zero
             if ZEROUT_DUMMY_WORD:

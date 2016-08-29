@@ -802,6 +802,27 @@ class PairwiseWithFeatsLayer(Layer):
       out = T.concatenate([dot.dimshuffle(0, 'x'), q, a, feats], axis=1)
       return out
 
+class PairwiseFeatsOnlyLayer(Layer):
+    def __init__(self, n_in, activation=T.tanh):
+        super(PairwiseFeatsOnlyLayer, self).__init__()
+
+        W = build_shared_zeros((n_in, n_in), 'W_softmax_pairwise')
+
+        self.W = W
+        self.weights = [self.W]
+
+    def __repr__(self):
+        return "{}: W={}".format(self.__class__.__name__, self.W.shape.eval())
+
+    def output_func(self, input):
+        # P(Y|X) = softmax(W.X + b)
+        q, feats = input[0], input[1]
+
+        dot = T.dot(q, self.W)
+        # dot = T.batched_dot(q, self.W.T)
+        out = T.concatenate([dot, feats], axis=1)
+        return out
+
 
 class PairwiseNoFeatsLayer(Layer):
   def __init__(self, q_in, a_in, activation=T.tanh):
