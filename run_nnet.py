@@ -196,7 +196,7 @@ def main():
 
     ts = datetime.now().strftime('%Y-%m-%d-%H.%M.%S')
     if len(sys.argv) > 1:
-        nnet_outdir = '.exp.out/{}'.format(sys.argv[1])
+        nnet_outdir = 'exp.out/{}'.format(sys.argv[1])
     else:
         nnet_outdir = 'exp.out/ndim={};batch={};max_norm={};learning_rate={};{}'.format(ndim, batch_size, max_norm, learning_rate, ts)
     if not os.path.exists(nnet_outdir):
