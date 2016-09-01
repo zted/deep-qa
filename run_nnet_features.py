@@ -55,14 +55,6 @@ def main():
     add_features_train = add_features_train.reshape(a_train.shape[0], 1)
     add_features_dev = add_features_dev.reshape(a_dev.shape[0], 1)
     qids_dev = numpy.load(os.path.join(data_dir, 'dev.qids.npy'))
-    # feats_ndim = x_train.shape[1]
-
-    # from sklearn.preprocessing import StandardScaler
-    # scaler = StandardScaler()
-    # print "Scaling overlap features"
-    # x_train = scaler.fit_transform(x_train)
-    # x_dev = scaler.transform(x_dev)
-    # x_test = scaler.transform(x_test)
 
     print 'y_train', numpy.unique(y_train, return_counts=True)
     print 'y_dev', numpy.unique(y_dev, return_counts=True)
@@ -77,13 +69,6 @@ def main():
     print 'a_test', a_test.shape
 
     print 'x_dev', x_dev.shape
-
-    ## Get the word embeddings from the nnet trained on SemEval
-    # ndim = 40
-    # nnet_outdir = 'exp/ndim=60;batch=100;max_norm=0;learning_rate=0.1;2014-12-02-15:53:14'
-    # nnet_fname = os.path.join(nnet_outdir, 'nnet.dat')
-    # params_fname = os.path.join(nnet_outdir, 'best_dev_params.epoch=00;batch=14640;dev_f1=83.12;test_acc=85.00.dat')
-    # train_nnet, test_nnet = nn_layers.load_nnet(nnet_fname, params_fname)
 
     numpy_rng = numpy.random.RandomState(123)
     q_max_sent_size = q_train.shape[1]
@@ -174,8 +159,6 @@ def main():
         flatten_layer,
     ])
     nnet_q.set_input((x_q, x_q_overlap))
-    ######
-
 
     ###### ANSWER ######
     lookup_table_words = nn_layers.LookupTableFastStatic(W=vocab_emb, pad=max(q_filter_widths)-1)
@@ -203,50 +186,9 @@ def main():
         flatten_layer,
     ])
     nnet_a.set_input((x_a, x_a_overlap))
-    #######
-    # print 'nnet_q.output', nnet_q.output.ndim
 
     q_logistic_n_in = nkernels * len(q_filter_widths) * q_k_max
     a_logistic_n_in = nkernels * len(a_filter_widths) * a_k_max
-
-    # dropout_q = nn_layers.FastDropoutLayer(rng=numpy_rng)
-    # dropout_a = nn_layers.FastDropoutLayer(rng=numpy_rng)
-    # dropout_q.set_input(nnet_q.output)
-    # dropout_a.set_input(nnet_a.output)
-
-    # feats_nout = 10
-    # x_hidden_layer = nn_layers.LinearLayer(numpy_rng, n_in=feats_ndim, n_out=feats_nout, activation=activation)
-    # x_hidden_layer.set_input(x)
-
-    # feats_nout = feats_ndim
-
-    ### Dropout
-    # classifier = nn_layers.PairwiseLogisticWithFeatsRegression(q_in=logistic_n_in,
-    #                                                   a_in=logistic_n_in,
-    #                                                   n_in=feats_nout,
-    #                                                   n_out=n_outs)
-    # # classifier.set_input((dropout_q.output, dropout_a.output, x_hidden_layer.output))
-    # classifier.set_input((dropout_q.output, dropout_a.output, x))
-
-    # # train_nnet = nn_layers.FeedForwardNet(layers=[nnet_q, nnet_a, x_hidden_layer, dropout_q, dropout_a, classifier],
-    # train_nnet = nn_layers.FeedForwardNet(layers=[nnet_q, nnet_a, dropout_q, dropout_a, classifier],
-    #                                       name="Training nnet")
-
-    # test_classifier = nn_layers.PairwiseLogisticWithFeatsRegression(q_in=logistic_n_in,
-    #                                                         a_in=logistic_n_in,
-    #                                                         n_in=feats_nout,
-    #                                                         n_out=n_outs,
-    #                                                         W=classifier.W,
-    #                                                         W_feats=classifier.W_feats,
-    #                                                         b=classifier.b)
-    # # test_classifier.set_input((nnet_q.output, nnet_a.output, x_hidden_layer.output))
-    # test_classifier.set_input((nnet_q.output, nnet_a.output, x))
-    # # test_nnet = nn_layers.FeedForwardNet(layers=[nnet_q, nnet_a, x_hidden_layer, test_classifier],
-    # test_nnet = nn_layers.FeedForwardNet(layers=[nnet_q, nnet_a, test_classifier],
-    #                                       name="Test nnet")
-    #########
-
-    # pairwise_layer = nn_layers.PairwiseMultiOnlySimWithFeatsLayer(q_in=q_logistic_n_in,
 
     pairwise_layer = nn_layers.PairwiseNoFeatsLayer(q_in=q_logistic_n_in,
                                                     # pairwise_layer = nn_layers.PairwiseWithFeatsLayer(q_in=q_logistic_n_in,
@@ -254,12 +196,7 @@ def main():
                                                     a_in=a_logistic_n_in)
     pairwise_layer.set_input((nnet_q.output, nnet_a.output))
 
-    # n_in = q_logistic_n_in + a_logistic_n_in + feats_ndim + a_logistic_n_in
-    # n_in = q_logistic_n_in + a_logistic_n_in + feats_ndim + 50
-    # n_in = q_logistic_n_in + a_logistic_n_in + feats_ndim + 1
     n_in = q_logistic_n_in + a_logistic_n_in + 1
-    # n_in = feats_ndim + 1
-    # n_in = feats_ndim + 50
 
     hidden_layer = nn_layers.LinearLayer(numpy_rng, n_in=n_in, n_out=n_outs, activation=activation)
     hidden_layer.set_input(pairwise_layer.output)
@@ -290,7 +227,7 @@ def main():
 
     ts = datetime.now().strftime('%Y-%m-%d-%H.%M.%S')
     if len(sys.argv) > 1:
-        nnet_outdir = '.exp.out/{}'.format(sys.argv[1])
+        nnet_outdir = 'exp.out/{}'.format(sys.argv[1])
     else:
         nnet_outdir = 'exp.out/ndim={};batch={};max_norm={};learning_rate={};{}'.format(ndim, batch_size, max_norm, learning_rate, ts)
     if not os.path.exists(nnet_outdir):
@@ -300,35 +237,9 @@ def main():
     print 'Total params number:', total_params
 
     cost = train_nnet.layers[-1].training_cost(y)
-    # y_train_counts = numpy.unique(y_train, return_counts=True)[1].astype(numpy.float32)
-    # weights_data = numpy.sum(y_train_counts) / y_train_counts
-    # weights_data_norm = numpy.linalg.norm(weights_data)
-    # weights_data /= weights_data_norm
-    # print 'weights_data', weights_data
-    # weights = theano.shared(weights_data, borrow=True)
-    # cost = train_nnet.layers[-1].training_cost_weighted(y, weights=weights)
 
     predictions = test_nnet.layers[-1].y_pred
     predictions_prob = test_nnet.layers[-1].p_y_given_x[:,-1]
-
-    ### L2 regularization
-    # L2_word_emb = 1e-4
-    # L2_conv1d = 3e-5
-    # # L2_softmax = 1e-3
-    # L2_softmax = 1e-4
-    # print "Regularizing nnet weights"
-    # for w in train_nnet.weights:
-    #   L2_reg = 0.
-    #   if w.name.startswith('W_emb'):
-    #     L2_reg = L2_word_emb
-    #   elif w.name.startswith('W_conv1d'):
-    #     L2_reg = L2_conv1d
-    #   elif w.name.startswith('W_softmax'):
-    #     L2_reg = L2_softmax
-    #   elif w.name == 'W':
-    #     L2_reg = L2_softmax
-    #   print w.name, L2_reg
-    #   cost += T.sum(w**2) * L2_reg
 
     batch_x = T.dmatrix('batch_x')
     batch_x_q = T.lmatrix('batch_x_q')
