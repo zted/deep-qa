@@ -8,8 +8,6 @@ import sys
 import theano
 import time
 from collections import defaultdict
-import subprocess
-import pandas as pd
 from tqdm import tqdm
 
 import nn_layers
@@ -56,7 +54,7 @@ def main():
 
     add_features_train = add_features_train.reshape(a_train.shape[0], 1)
     add_features_dev = add_features_dev.reshape(a_dev.shape[0], 1)
-
+    qids_dev = numpy.load(os.path.join(data_dir, 'dev.qids.npy'))
     # feats_ndim = x_train.shape[1]
 
     # from sklearn.preprocessing import StandardScaler
@@ -291,7 +289,10 @@ def main():
     params = train_nnet.params
 
     ts = datetime.now().strftime('%Y-%m-%d-%H.%M.%S')
-    nnet_outdir = 'exp.out/ndim={};batch={};max_norm={};learning_rate={};{}'.format(ndim, batch_size, max_norm, learning_rate, ts)
+    if len(sys.argv) > 1:
+        nnet_outdir = '.exp.out/{}'.format(sys.argv[1])
+    else:
+        nnet_outdir = 'exp.out/ndim={};batch={};max_norm={};learning_rate={};{}'.format(ndim, batch_size, max_norm, learning_rate, ts)
     if not os.path.exists(nnet_outdir):
         os.makedirs(nnet_outdir)
 
@@ -391,7 +392,6 @@ def main():
 
     train_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_train, a_train, q_overlap_train, a_overlap_train, add_features_train, y_train], batch_size=batch_size, randomize=True)
     dev_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_dev, a_dev, q_overlap_dev, a_overlap_dev, add_features_dev, y_dev], batch_size=batch_size, randomize=False)
-    test_set_iterator = sgd_trainer.MiniBatchIteratorConstantBatchSize(numpy_rng, [q_test, a_test, q_overlap_test, a_overlap_test, y_test], batch_size=batch_size, randomize=False)
 
     labels = sorted(numpy.unique(y_test))
     print 'labels', labels
@@ -419,11 +419,6 @@ def main():
         zerout_dummy_word = theano.function([], updates=[(W, T.set_subtensor(W[-1:], 0.)) for W in W_emb_list])
 
 
-    # weights_dev = numpy.zeros(len(y_dev))
-    # weights_dev[y_dev == 0] = weights_data[0]
-    # weights_dev[y_dev == 1] = weights_data[1]
-    # print weights_dev
-
     def findWrongPredictions(y_true, y_pred, pids):
         wrong_pids = []
         for n, pairs in enumerate(zip(y_true, y_pred)):
@@ -448,13 +443,9 @@ def main():
                 zerout_dummy_word()
 
             if i % 10 == 0 or i == num_train_batches:
-                y_pred_dev = predict_prob_batch(dev_set_iterator)
-                # # dev_acc = map_score(qids_dev, y_dev, predict_prob_batch(dev_set_iterator)) * 100
-                dev_acc = metrics.roc_auc_score(y_dev, y_pred_dev) * 100
+                dev_acc = map_score(qids_dev, y_dev, predict_prob_batch(dev_set_iterator)) * 100
+                # dev_acc = metrics.roc_auc_score(y_dev, predict_prob_batch(dev_set_iterator)) * 100
                 if dev_acc > best_dev_acc:
-                    # y_pred = predict_prob_batch(test_set_iterator)
-                    # test_acc = map_score(qids_test, y_test, y_pred) * 100
-
                     print('epoch: {} batch: {} dev auc: {:.4f}; best_dev_acc: {:.4f}'.format(epoch, i, dev_acc, best_dev_acc))
                     # wrongPreds = findWrongPredictions(y_dev, y_pred_dev, pids_dev)
                     best_dev_acc = dev_acc
@@ -470,37 +461,8 @@ def main():
         print('epoch {} took {:.4f} seconds'.format(epoch, time.time() - timer))
         epoch += 1
         no_best_dev_update += 1
-    fname = os.path.join(nnet_outdir, 'best_dev_params.epoch={:02d};batch={:05d};dev_acc={:.2f}.dat'.format(epoch, i, best_dev_acc))
-    cPickle.dump(best_params, open(fname, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
     print('Training took: {:.4f} seconds'.format(time.time() - timer_train))
-    for i, param in enumerate(best_params):
-        params[i].set_value(param, borrow=True)
-
-        # y_pred_test = predict_prob_batch(test_set_iterator)
-        # test_acc = map_score(qids_test, y_test, y_pred_test) * 100
-
-
-        # print "Running trec_eval script..."
-        # N = len(y_pred_test)
-        #
-        # df_submission = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rank', 'sim', 'run_id'])
-        # df_submission['qid'] = qids_test
-        # df_submission['iter'] = 0
-        # df_submission['docno'] = pids_test
-        # df_submission['rank'] = 0
-        # df_submission['sim'] = y_pred_test
-        # df_submission['run_id'] = 'nnet'
-        # df_submission.to_csv(os.path.join(nnet_outdir, 'submission.txt'), header=False, index=False, sep=' ')
-
-        # df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
-        # df_gold['qid'] = qids_test
-        # df_gold['iter'] = 0
-        # df_gold['docno'] = numpy.arange(N)
-        # df_gold['rel'] = y_test
-        # df_gold.to_csv(os.path.join(nnet_outdir, 'gold.txt'), header=False, index=False, sep=' ')
-        #
-        # subprocess.call("/bin/sh run_eval.sh '{}'".format(nnet_outdir), shell=True)
 
 
 if __name__ == '__main__':

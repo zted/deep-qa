@@ -260,7 +260,6 @@ def main():
             somefile.write('\t'.join(a[1]))
         return
 
-    print "Running trec_eval script..."
     N = len(y_pred_test)
 
     submission_name = os.path.join(nnet_outdir, 'submission.txt')
