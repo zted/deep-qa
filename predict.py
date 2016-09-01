@@ -82,7 +82,6 @@ def main():
     x_q_overlap = T.lmatrix('q_overlap')
     x_a = T.lmatrix('a')
     x_a_overlap = T.lmatrix('a_overlap')
-    y = T.ivector('y')
 
     #######
     n_outs = 2
@@ -205,8 +204,6 @@ def main():
     total_params = sum([numpy.prod(param.shape.eval()) for param in params])
     print 'Total params number:', total_params
 
-    cost = train_nnet.layers[-1].training_cost(y)
-    predictions = test_nnet.layers[-1].y_pred
     predictions_prob = test_nnet.layers[-1].p_y_given_x[:,-1]
 
     # batch_x = T.dmatrix('batch_x')
@@ -214,28 +211,18 @@ def main():
     batch_x_a = T.lmatrix('batch_x_a')
     batch_x_q_overlap = T.lmatrix('batch_x_q_overlap')
     batch_x_a_overlap = T.lmatrix('batch_x_a_overlap')
-    batch_y = T.ivector('batch_y')
-
-    # updates = sgd_trainer.get_adagrad_updates(cost, params, learning_rate=learning_rate, max_norm=max_norm, _eps=1e-6)
-    updates = sgd_trainer.get_adadelta_updates(cost, params, rho=0.95, eps=1e-6, max_norm=max_norm, word_vec_name='W_emb')
 
     inputs_pred = [batch_x_q,
                    batch_x_a,
                    batch_x_q_overlap,
                    batch_x_a_overlap,
-                   # batch_x,
                    ]
 
     givens_pred = {x_q: batch_x_q,
                    x_a: batch_x_a,
                    x_q_overlap: batch_x_q_overlap,
                    x_a_overlap: batch_x_a_overlap,
-                   # x: batch_x
                    }
-
-    pred_fn = theano.function(inputs=inputs_pred,
-                              outputs=predictions,
-                              givens=givens_pred)
 
     pred_prob_fn = theano.function(inputs=inputs_pred,
                                    outputs=predictions_prob,
@@ -255,11 +242,9 @@ def main():
         W_emb_list = [w for w in params if w.name == 'W_emb']
         zerout_dummy_word = theano.function([], updates=[(W, T.set_subtensor(W[-1:], 0.)) for W in W_emb_list])
 
-    best_dev_acc = -numpy.inf
-    epoch = 0
     timer_train = time.time()
 
-    model_file = open('./saved_params/params_tf_neg_10', 'rb')
+    model_file = open('./saved_params/params_neg_50_F1_sel', 'rb')
     best_params = cPickle.load(model_file)
     model_file.close()
 
@@ -268,10 +253,6 @@ def main():
         params[i].set_value(param, borrow=True)
 
     y_pred_test = predict_prob_batch(test_set_iterator)
-    # test_acc = map_score(qids_test, y_test, y_pred_test) * 100
-    fname = os.path.join(nnet_outdir, 'best_dev_params.epoch={:02d};batch={:05d};dev_acc={:.2f}.dat'.format(epoch, i, best_dev_acc))
-    numpy.savetxt(os.path.join(nnet_outdir, 'test.epoch={:02d};batch={:05d};dev_acc={:.2f}.predictions.npy'.format(epoch, i, best_dev_acc)), y_pred_test)
-    cPickle.dump(best_params, open(fname, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
     def writeOut(somefile, someArray):
         sortedArray = sorted(someArray, key=lambda score: score[0], reverse=True)
@@ -312,14 +293,6 @@ def main():
         writeOut(outf,someArray)
     outf.close()
 
-    # df_gold = pd.DataFrame(index=numpy.arange(N), columns=['qid', 'iter', 'docno', 'rel'])
-    # df_gold['qid'] = qids_test
-    # df_gold['iter'] = 0
-    # df_gold['docno'] = numpy.arange(N)
-    # df_gold['rel'] = y_test
-    # df_gold.to_csv(os.path.join(nnet_outdir, 'gold.txt'), header=False, index=False, sep=' ')
-
-    # subprocess.call("/bin/sh run_eval.sh '{}'".format(nnet_outdir), shell=True)
 
 if __name__ == '__main__':
     main()
