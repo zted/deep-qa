@@ -195,12 +195,6 @@ def main():
 
     params = train_nnet.params
 
-    ts = datetime.now().strftime('%Y-%m-%d-%H.%M.%S')
-    nnet_outdir = 'exp.out/ndim={};batch={};max_norm={};learning_rate={};{}'.format(ndim, batch_size, max_norm, learning_rate, ts)
-    if not os.path.exists(nnet_outdir):
-        os.makedirs(nnet_outdir)
-
-
     total_params = sum([numpy.prod(param.shape.eval()) for param in params])
     print 'Total params number:', total_params
 
@@ -244,7 +238,13 @@ def main():
 
     timer_train = time.time()
 
-    model_file = open('./saved_params/params_neg_50_F1_sel', 'rb')
+    model_name = 'params_as'
+
+    nnet_outdir = 'exp.out/{}'.format(model_name)
+    if not os.path.exists(nnet_outdir):
+        os.makedirs(nnet_outdir)
+
+    model_file = open('./saved_params/{}'.format(model_name), 'rb')
     best_params = cPickle.load(model_file)
     model_file.close()
 

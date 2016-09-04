@@ -48,7 +48,7 @@ def main():
     qids_test = numpy.load(os.path.join(data_dir, 'test.qids.npy'))
     pids_test = numpy.load(os.path.join(data_dir, 'test.pids.npy'))
 
-    add_features_test = numpy.load(os.path.join(data_dir, 'additional_feats_test.npy'))
+    add_features_test = numpy.load(os.path.join(data_dir, 'additional_feats_test_retrieved.npy'))
     add_features_test = add_features_test.reshape(a_test.shape[0], 1)
 
     print 'y_train', numpy.unique(y_train, return_counts=True)
@@ -210,12 +210,6 @@ def main():
 
     params = train_nnet.params
 
-    ts = datetime.now().strftime('%Y-%m-%d-%H.%M.%S')
-    nnet_outdir = 'exp.out/ndim={};batch={};max_norm={};learning_rate={};{}'.format(ndim, batch_size, max_norm, learning_rate, ts)
-    if not os.path.exists(nnet_outdir):
-        os.makedirs(nnet_outdir)
-
-
     total_params = sum([numpy.prod(param.shape.eval()) for param in params])
     print 'Total params number:', total_params
 
@@ -261,7 +255,13 @@ def main():
 
     timer_train = time.time()
 
-    model_file = open('./saved_params/params_features_MAP2', 'rb')
+    model_name = 'params_features_MAP'
+
+    nnet_outdir = 'exp.out/{}'.format(model_name)
+    if not os.path.exists(nnet_outdir):
+        os.makedirs(nnet_outdir)
+
+    model_file = open('./saved_params/{}'.format(model_name), 'rb')
     best_params = cPickle.load(model_file)
     model_file.close()
 
