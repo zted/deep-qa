@@ -255,7 +255,10 @@ def main():
 
     timer_train = time.time()
 
-    model_name = 'params_features_MAP'
+    if len(sys.argv) > 1:
+        model_name = sys.argv[1]
+    else:
+        raise ValueError('Must enter name of saved params file')
 
     nnet_outdir = 'exp.out/{}'.format(model_name)
     if not os.path.exists(nnet_outdir):

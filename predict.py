@@ -237,8 +237,10 @@ def main():
         zerout_dummy_word = theano.function([], updates=[(W, T.set_subtensor(W[-1:], 0.)) for W in W_emb_list])
 
     timer_train = time.time()
-
-    model_name = 'params_as'
+    if len(sys.argv) > 1:
+        model_name = sys.argv[1]
+    else:
+        raise ValueError('Must enter name of saved params file')
 
     nnet_outdir = 'exp.out/{}'.format(model_name)
     if not os.path.exists(nnet_outdir):
